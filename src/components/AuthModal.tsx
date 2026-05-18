@@ -49,7 +49,16 @@ export default function AuthModal({ onClose }: Props) {
       await signInGoogle();
       onClose();
     } catch (err: any) {
-      setError('Błąd logowania przez Google');
+      console.error('Google sign-in error:', err.code, err.message);
+      if (err.code === 'auth/popup-blocked') {
+        setError('Popup zablokowany — odblokuj popupy dla tej strony');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Zamknąłeś okno logowania');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('Domena nie jest autoryzowana w Firebase');
+      } else {
+        setError(`Błąd logowania przez Google (${err.code || 'unknown'})`);
+      }
     } finally {
       setLoading(false);
     }
