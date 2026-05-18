@@ -44,6 +44,7 @@ export async function GET() {
   }
 
   try {
+    const twoHoursAgo = Timestamp.fromMillis(Date.now() - 2 * 60 * 60 * 1000);
     const [liveSnap, upcomingSnap] = await Promise.all([
       adminDb.collection('matches')
         .where('status', '==', 'live')
@@ -52,6 +53,7 @@ export async function GET() {
         .get(),
       adminDb.collection('matches')
         .where('status', '==', 'upcoming')
+        .where('commenceTime', '>', twoHoursAgo)
         .orderBy('commenceTime', 'asc')
         .limit(500)
         .get(),
