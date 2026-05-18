@@ -11,51 +11,24 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-function getApp(): FirebaseApp | undefined {
-  // During build-time prerendering env vars may be empty — skip init
-  if (!firebaseConfig.apiKey) return undefined;
-  if (getApps().length > 0) return getApps()[0];
-  return initializeApp(firebaseConfig);
+// During build-time prerendering, NEXT_PUBLIC_* env vars may be empty strings.
+// In client runtime they are always inlined by Next.js bundler.
+function init() {
+  if (!firebaseConfig.apiKey) {
+    return { app: undefined, db: undefined, auth: undefined };
+  }
+  const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  return { app, db, auth };
 }
 
-let _app: FirebaseApp | undefined;
-let _db: Firestore | undefined;
-let _auth: Auth | undefined;
+const { app, db, auth } = init();
 
-export function getFirebaseApp(): FirebaseApp | undefined {
-  if (!_app) _app = getApp();
-  return _app;
-}
+// Export with definite types — in client code these are always defined.
+// Server prerender code should not use these directly.
+export { db, auth };
+export default app;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const db: Firestore = new Proxy({} as any, {
-  get(_, prop) {
-    if (!_db) {
-      const app = getFirebaseApp();
-      if (!app) return undefined;
-      _db = getFirestore(app);
-    }
-    return (_db as unknown as Record<string, unknown>)[prop as string];
-  },
-});
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const auth: Auth = new Proxy({} as any, {
-  get(_, prop) {
-    if (!_auth) {
-      const app = getFirebaseApp();
-      if (!app) return undefined;
-      _auth = getAuth(app);
-    }
-    return (_auth as unknown as Record<string, unknown>)[prop as string];
-  },
-});
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default new Proxy({} as any, {
-  get(_, prop) {
-    const app = getFirebaseApp();
-    if (!app) return undefined;
-    return (app as unknown as Record<string, unknown>)[prop as string];
-  },
-});
+// Re-export types for convenience
+export type { FirebaseApp, Firestore, Auth };
