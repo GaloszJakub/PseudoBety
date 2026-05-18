@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pl">
-      <body style={{ fontFamily: 'var(--f-ui)' }}>
+      <body style={{ fontFamily: 'var(--f-ui)' }} suppressHydrationWarning>
         <AuthProvider><SWRProvider>{children}</SWRProvider></AuthProvider>
       </body>
     </html>
