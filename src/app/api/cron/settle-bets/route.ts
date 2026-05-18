@@ -8,6 +8,16 @@ export const dynamic = 'force-dynamic';
 
 const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY || '';
 
+const dateOffset = (ms: number) => new Date(Date.now() + ms).toISOString().split('T')[0];
+const yesterday = () => dateOffset(-86400000);
+const today = () => dateOffset(0);
+
+function footballStatus(short: string): 'upcoming' | 'live' | 'finished' {
+  if (['NS', 'TBD'].includes(short)) return 'upcoming';
+  if (['FT', 'AET', 'PEN', 'AWD', 'WO'].includes(short)) return 'finished';
+  return 'live';
+}
+
 interface Selection {
   matchId: string;
   matchLabel?: string;
@@ -88,34 +98,38 @@ export async function GET(req: NextRequest) {
   const authError = verifyCronToken(req);
   if (authError) return authError;
 
-  // 1. Aktualizuj live mecze
+  // 1. Aktualizuj mecze: live=all + yesterday + today (żeby złapać zakończone z wynikami)
   let liveUpdated = 0;
   if (API_FOOTBALL_KEY) {
-    try {
-      const res = await fetch('https://v3.football.api-sports.io/fixtures?live=all', {
-        headers: { 'x-apisports-key': API_FOOTBALL_KEY },
-        next: { revalidate: 0 },
-      });
-      if (res.ok) {
+    const urls = [
+      'https://v3.football.api-sports.io/fixtures?live=all',
+      `https://v3.football.api-sports.io/fixtures?date=${yesterday()}`,
+      `https://v3.football.api-sports.io/fixtures?date=${today()}`,
+    ];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          headers: { 'x-apisports-key': API_FOOTBALL_KEY },
+          next: { revalidate: 0 },
+        });
+        if (!res.ok) continue;
         const json = await res.json();
         const fixtures = json.response || [];
         const batch = adminDb.batch();
         for (const f of fixtures) {
-          const short = f.fixture.status.short;
-          const isFinished = ['FT', 'AET', 'PEN', 'AWD', 'WO'].includes(short);
-          const isLive = !isFinished && !['NS', 'TBD'].includes(short);
+          const status = footballStatus(f.fixture.status.short);
           const ref = adminDb.doc(`matches/afoot-${f.fixture.id}`);
-          batch.update(ref, {
-            status: isFinished ? 'finished' : isLive ? 'live' : 'upcoming',
+          batch.set(ref, {
+            status,
             score: [f.goals.home ?? 0, f.goals.away ?? 0],
             minute: f.fixture.status.elapsed ? `${f.fixture.status.elapsed}'` : null,
             liveUpdatedAt: FieldValue.serverTimestamp(),
-          });
+          }, { merge: true });
           liveUpdated++;
         }
         await batch.commit();
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
   }
 
   // 2. Pobierz zakończone mecze z wynikiem
