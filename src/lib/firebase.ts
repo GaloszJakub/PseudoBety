@@ -11,38 +11,51 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-function getApp(): FirebaseApp {
+function getApp(): FirebaseApp | undefined {
+  // During build-time prerendering env vars may be empty — skip init
+  if (!firebaseConfig.apiKey) return undefined;
   if (getApps().length > 0) return getApps()[0];
   return initializeApp(firebaseConfig);
 }
 
-// Lazy singletons — avoid crashing during build-time prerendering
-// when env vars are not yet available
 let _app: FirebaseApp | undefined;
 let _db: Firestore | undefined;
 let _auth: Auth | undefined;
 
-export function getFirebaseApp(): FirebaseApp {
+export function getFirebaseApp(): FirebaseApp | undefined {
   if (!_app) _app = getApp();
   return _app;
 }
 
-export const db: Firestore = new Proxy({} as Firestore, {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const db: Firestore = new Proxy({} as any, {
   get(_, prop) {
-    if (!_db) _db = getFirestore(getFirebaseApp());
+    if (!_db) {
+      const app = getFirebaseApp();
+      if (!app) return undefined;
+      _db = getFirestore(app);
+    }
     return (_db as unknown as Record<string, unknown>)[prop as string];
   },
 });
 
-export const auth: Auth = new Proxy({} as Auth, {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const auth: Auth = new Proxy({} as any, {
   get(_, prop) {
-    if (!_auth) _auth = getAuth(getFirebaseApp());
+    if (!_auth) {
+      const app = getFirebaseApp();
+      if (!app) return undefined;
+      _auth = getAuth(app);
+    }
     return (_auth as unknown as Record<string, unknown>)[prop as string];
   },
 });
 
-export default new Proxy({} as FirebaseApp, {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default new Proxy({} as any, {
   get(_, prop) {
-    return (getFirebaseApp() as unknown as Record<string, unknown>)[prop as string];
+    const app = getFirebaseApp();
+    if (!app) return undefined;
+    return (app as unknown as Record<string, unknown>)[prop as string];
   },
 });
