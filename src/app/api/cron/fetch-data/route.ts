@@ -367,8 +367,9 @@ export async function GET(req: NextRequest) {
       for (const ev of events) {
         const hs = nameScore(normHome, norm(ev.home));
         const as_ = nameScore(normAway, norm(ev.away));
-        if (hs < 1 || as_ < 1) continue;
+        if (hs < 0.3 || as_ < 0.3) continue;
         const score = hs + as_;
+        if (score < 0.8) continue;
         if (score > bestScore) { bestScore = score; best = ev; }
       }
     }
@@ -411,7 +412,7 @@ export async function GET(req: NextRequest) {
   // ── Phase 3b: Batch fetch odds for matched events only ─────────────────────
   // max 10 per request → N_matched/10 requests total (very cheap)
 
-  const matchedIds = [...new Set(needOddsDocs.map(x => x.eventId))].slice(0, 200);
+  const matchedIds = [...new Set(needOddsDocs.map(x => x.eventId))].slice(0, 800);
   for (let i = 0; i < matchedIds.length; i += 10) {
     const ids = matchedIds.slice(i, i + 10).join(',');
     try {

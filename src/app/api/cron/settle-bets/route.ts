@@ -14,7 +14,7 @@ interface Selection {
   pick: string;
   marketType?: string;
   odds: number;
-  result?: 'won' | 'lost' | 'pending';
+  result?: 'won' | 'lost' | 'pending' | 'push';
 }
 
 interface Bet {
@@ -27,9 +27,12 @@ interface Bet {
   selections: Selection[];
 }
 
-function resolveSelection(sel: Selection, homeScore: number, awayScore: number): 'won' | 'lost' {
+type FinishedMatch = { score: [number, number]; home: string; away: string };
+
+function resolveSelection(sel: Selection, m: FinishedMatch): 'won' | 'lost' | 'push' {
   const pick = sel.pick.toLowerCase();
   const mt = sel.marketType || 'h2h';
+  const [homeScore, awayScore] = m.score;
 
   if (mt === 'h2h') {
     if (pick.startsWith('1 ·')) return homeScore > awayScore ? 'won' : 'lost';
@@ -38,9 +41,10 @@ function resolveSelection(sel: Selection, homeScore: number, awayScore: number):
   }
 
   if (mt === 'totals') {
-    const m = pick.match(/(\d+\.?\d*)/);
-    const line = m ? parseFloat(m[1]) : 2.5;
+    const match = pick.match(/(\d+\.?\d*)/);
+    const line = match ? parseFloat(match[1]) : 2.5;
     const total = homeScore + awayScore;
+    if (total === line) return 'push';
     if (pick.startsWith('ponad')) return total > line ? 'won' : 'lost';
     if (pick.startsWith('poniżej')) return total < line ? 'won' : 'lost';
   }
@@ -58,26 +62,25 @@ function resolveSelection(sel: Selection, homeScore: number, awayScore: number):
   }
 
   if (mt === 'draw_no_bet') {
-    if (homeScore === awayScore) return 'lost';
-    const homeTeam = (sel.matchLabel || '').split(' vs ')[0].toLowerCase();
-    const pickedHome = pick.includes(homeTeam) || pick.includes('dnb ·') && pick.split('dnb · ')[1]?.trim() === homeTeam;
+    if (homeScore === awayScore) return 'push';
+    const pickedHome = pick.includes(m.home);
     if (pickedHome) return homeScore > awayScore ? 'won' : 'lost';
     return awayScore > homeScore ? 'won' : 'lost';
   }
 
   if (mt === 'spreads') {
-    const m = pick.match(/([+-]?\d+\.?\d*)$/);
-    const handicap = m ? parseFloat(m[1]) : 0;
-    const homeTeam = (sel.matchLabel || '').split(' vs ')[0].toLowerCase();
-    const pickedHome = pick.startsWith(homeTeam);
-    if (pickedHome) return (homeScore + handicap) > awayScore ? 'won' : 'lost';
-    return (awayScore + Math.abs(handicap)) > homeScore ? 'won' : 'lost';
+    // label formats from parseMarkets: "{home} 0", "{home} +{N}", "{away} +{N}"
+    const hdpMatch = pick.match(/\s([+-]?\d+\.?\d*)\s*$/);
+    const hdp = hdpMatch ? parseFloat(hdpMatch[1]) : 0;
+    const pickedHome = pick.startsWith(m.home);
+    const effective = pickedHome
+      ? homeScore + hdp - awayScore
+      : awayScore + hdp - homeScore;
+    if (effective > 0) return 'won';
+    if (effective === 0) return 'push';
+    return 'lost';
   }
 
-  // Legacy: h2h without marketType
-  if (pick.startsWith('1 ·')) return homeScore > awayScore ? 'won' : 'lost';
-  if (pick.startsWith('x ·') || pick.includes('remis')) return homeScore === awayScore ? 'won' : 'lost';
-  if (pick.startsWith('2 ·')) return awayScore > homeScore ? 'won' : 'lost';
   return 'lost';
 }
 
@@ -115,15 +118,21 @@ export async function GET(req: NextRequest) {
     } catch (_) {}
   }
 
-  // 2. Pobierz zakończone mecze
+  // 2. Pobierz zakończone mecze z wynikiem
   const finishedSnap = await adminDb.collection('matches')
     .where('status', '==', 'finished')
     .get();
 
-  const finishedMap = new Map<string, [number, number]>();
+  const finishedMap = new Map<string, FinishedMatch>();
   for (const doc of finishedSnap.docs) {
     const d = doc.data();
-    if (d.score) finishedMap.set(doc.id, [d.score[0], d.score[1]]);
+    if (d.score) {
+      finishedMap.set(doc.id, {
+        score: [d.score[0], d.score[1]],
+        home: (d.home?.name || '').toLowerCase(),
+        away: (d.away?.name || '').toLowerCase(),
+      });
+    }
   }
 
   // 3. Rozlicz pending zakłady
@@ -138,24 +147,32 @@ export async function GET(req: NextRequest) {
     const bet = { id: betDoc.id, ...betDoc.data() } as Bet;
 
     const resolved = bet.selections.map(sel => {
-      const result = finishedMap.get(sel.matchId);
-      if (!result) return { ...sel, result: 'pending' as const };
-      return { ...sel, result: resolveSelection(sel, result[0], result[1]) };
+      const m = finishedMap.get(sel.matchId);
+      if (!m) return { ...sel, result: 'pending' as const };
+      return { ...sel, result: resolveSelection(sel, m) };
     });
 
     if (resolved.some(s => s.result === 'pending')) continue;
 
-    const won = resolved.every(s => s.result === 'won');
-    const actualWin = won ? bet.potentialWin : 0;
+    // Push legs count as odds=1 (refund), non-push must all be won
+    const newTotalOdds = resolved.reduce(
+      (acc, s) => acc * (s.result === 'push' ? 1 : s.odds),
+      1,
+    );
+    const nonPush = resolved.filter(s => s.result !== 'push');
+    const allWon = nonPush.length === 0 ? true : nonPush.every(s => s.result === 'won');
+
+    const actualWin = allWon ? bet.stake * newTotalOdds : 0;
+    const status: 'won' | 'lost' = allWon ? 'won' : 'lost';
 
     batch.update(betDoc.ref, {
-      status: won ? 'won' : 'lost',
+      status,
       actualWin,
       selections: resolved,
       settledAt: FieldValue.serverTimestamp(),
     });
 
-    if (won) {
+    if (actualWin > 0) {
       batch.update(adminDb.doc(`users/${bet.userId}`), {
         balance: FieldValue.increment(actualWin),
       });
@@ -165,5 +182,5 @@ export async function GET(req: NextRequest) {
 
   await batch.commit();
 
-  return NextResponse.json({ ok: true, liveUpdated, settled });
+  return NextResponse.json({ ok: true, liveUpdated, finishedMatches: finishedMap.size, settled });
 }
