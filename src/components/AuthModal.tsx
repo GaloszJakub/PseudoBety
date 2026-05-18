@@ -49,9 +49,9 @@ export default function AuthModal({ onClose }: Props) {
       await signInGoogle();
       onClose();
     } catch (err: any) {
-      console.error('Google sign-in error:', err.code, err.message);
+      console.error('Google sign-in error:', err.code, err.message, err);
       if (err.code === 'auth/popup-blocked') {
-        setError('Popup zablokowany — odblokuj popupy dla tej strony');
+        setError('Popup zablokowany — kliknij ikonę w pasku adresu i zezwól na popupy dla tej strony, potem spróbuj ponownie');
       } else if (err.code === 'auth/popup-closed-by-user') {
         setError('Zamknąłeś okno logowania');
       } else if (err.code === 'auth/unauthorized-domain') {

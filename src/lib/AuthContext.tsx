@@ -3,7 +3,6 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signInWithPopup,
-  signInWithRedirect, getRedirectResult,
   GoogleAuthProvider, signOut, User
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
@@ -37,17 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [suspendedReason, setSuspendedReason] = useState<string | undefined>();
 
   useEffect(() => {
-    // Handle redirect result (when signInWithRedirect was used)
-    getRedirectResult(auth).then(result => {
-      if (result?.user) {
-        console.log('Redirect result: user logged in', result.user.email);
-        ensureUserDoc(result.user).catch(() => {});
-        setUser(result.user);
-      }
-    }).catch((err) => {
-      console.error('getRedirectResult error:', err);
-    });
-
     let balanceUnsub: (() => void) | null = null;
     const authUnsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -106,18 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    try {
-      const { user: u } = await signInWithPopup(auth, provider);
-      await ensureUserDoc(u);
-    } catch (err: any) {
-      console.error('Google sign-in error:', err.code, err.message);
-      if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
-        // Redirect as fallback — user will be logged in after page reload
-        signInWithRedirect(auth, provider);
-      } else {
-        throw err;
-      }
-    }
+    const { user: u } = await signInWithPopup(auth, provider);
+    await ensureUserDoc(u);
   };
 
   const logout = () => signOut(auth);
