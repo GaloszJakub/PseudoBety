@@ -30,19 +30,19 @@ export function getFirebaseApp(): FirebaseApp {
 export const db: Firestore = new Proxy({} as Firestore, {
   get(_, prop) {
     if (!_db) _db = getFirestore(getFirebaseApp());
-    return (_db as Record<string, unknown>)[prop as string];
+    return (_db as unknown as Record<string, unknown>)[prop as string];
   },
 });
 
 export const auth: Auth = new Proxy({} as Auth, {
   get(_, prop) {
     if (!_auth) _auth = getAuth(getFirebaseApp());
-    return (_auth as Record<string, unknown>)[prop as string];
+    return (_auth as unknown as Record<string, unknown>)[prop as string];
   },
 });
 
 export default new Proxy({} as FirebaseApp, {
   get(_, prop) {
-    return (getFirebaseApp() as Record<string, unknown>)[prop as string];
+    return (getFirebaseApp() as unknown as Record<string, unknown>)[prop as string];
   },
 });
