@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signInWithPopup,
+  signInWithRedirect, getRedirectResult,
   GoogleAuthProvider, signOut, User
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
@@ -36,6 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [suspendedReason, setSuspendedReason] = useState<string | undefined>();
 
   useEffect(() => {
+    // Handle redirect result (when signInWithRedirect was used)
+    getRedirectResult(auth).then(result => {
+      if (result?.user) ensureUserDoc(result.user).catch(() => {});
+    }).catch(() => {});
+
     let balanceUnsub: (() => void) | null = null;
     const authUnsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -93,8 +99,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInGoogle = async () => {
-    const { user: u } = await signInWithPopup(auth, new GoogleAuthProvider());
-    await ensureUserDoc(u);
+    const provider = new GoogleAuthProvider();
+    try {
+      const { user: u } = await signInWithPopup(auth, provider);
+      await ensureUserDoc(u);
+    } catch (err: any) {
+      // If popup blocked, fall back to redirect
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+        await signInWithRedirect(auth, provider);
+      } else {
+        throw err;
+      }
+    }
   };
 
   const logout = () => signOut(auth);
