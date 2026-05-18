@@ -15,7 +15,7 @@ const firebaseConfig = {
 // In client runtime they are always inlined by Next.js bundler.
 function init() {
   if (!firebaseConfig.apiKey) {
-    return { app: undefined, db: undefined, auth: undefined };
+    return { app: undefined as unknown as FirebaseApp, db: undefined as unknown as Firestore, auth: undefined as unknown as Auth };
   }
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   const db = getFirestore(app);
