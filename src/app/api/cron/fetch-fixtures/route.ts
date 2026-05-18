@@ -100,10 +100,29 @@ export async function GET(req: NextRequest) {
     await batch.commit();
   }
 
+  // Cleanup: mark stale "upcoming" matches (commenceTime > 3h ago) as finished
+  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const staleSnap = await adminDb.collection('matches')
+    .where('status', '==', 'upcoming')
+    .where('commenceTime', '<', threeHoursAgo)
+    .limit(400)
+    .get();
+
+  let staleFixed = 0;
+  if (!staleSnap.empty) {
+    const batch = adminDb.batch();
+    for (const doc of staleSnap.docs) {
+      batch.update(doc.ref, { status: 'finished', fixtureUpdatedAt: FieldValue.serverTimestamp() });
+      staleFixed++;
+    }
+    await batch.commit();
+  }
+
   return NextResponse.json({
     ok: true,
     fixturesTotal: docs.length,
     fixturesWritten: written,
+    staleFixed,
     errors,
   });
 }
