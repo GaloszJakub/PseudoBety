@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   collection, query, where, orderBy, limit, onSnapshot,
   doc, getDoc, updateDoc,
@@ -138,6 +138,63 @@ export default function ProfilePage({ userId, onBack }: Props) {
   const winRate = settledCount > 0 ? (wonCount / settledCount * 100) : 0;
   const roi = totalStaked > 0 ? ((totalWon - totalStaked) / totalStaked * 100) : 0;
 
+  // Wykres wydajności (skumulowany zysk/strata)
+  const settledBetsChronological = useMemo(() => {
+    return [...bets]
+      .filter(b => b.status !== 'pending')
+      .reverse();
+  }, [bets]);
+
+  const profitPoints = useMemo(() => {
+    const points = [0];
+    let running = 0;
+    for (const b of settledBetsChronological) {
+      const net = (b.actualWin ?? 0) - b.stake;
+      running += net;
+      points.push(running);
+    }
+    return points;
+  }, [settledBetsChronological]);
+
+  const currentProfit = profitPoints[profitPoints.length - 1] ?? 0;
+  const chartColor = currentProfit >= 0 ? '#4caf82' : '#e05555';
+
+  const chartWidth = 500;
+  const chartHeight = 160;
+  const paddingX = 20;
+  const paddingY = 25;
+
+  const { points, minVal, maxVal, pathD, areaD, zeroY } = useMemo(() => {
+    if (profitPoints.length < 2) return { points: [], minVal: 0, maxVal: 0, pathD: '', areaD: '', zeroY: 0 };
+
+    const minV = Math.min(...profitPoints);
+    const maxV = Math.max(...profitPoints);
+    
+    const range = maxV - minV;
+    const padding = range === 0 ? 10 : range * 0.15;
+    const minBound = minV - padding;
+    const maxBound = maxV + padding;
+    const boundRange = maxBound - minBound;
+
+    const coords = profitPoints.map((val, idx) => {
+      const x = paddingX + (idx / (profitPoints.length - 1)) * (chartWidth - paddingX * 2);
+      const y = chartHeight - paddingY - ((val - minBound) / boundRange) * (chartHeight - paddingY * 2);
+      return { x, y, val };
+    });
+
+    const pathD = coords.reduce((acc, c, idx) => {
+      return idx === 0 ? `M ${c.x} ${c.y}` : `${acc} L ${c.x} ${c.y}`;
+    }, '');
+
+    const areaD = coords.length > 0
+      ? `${pathD} L ${coords[coords.length - 1].x} ${chartHeight - paddingY} L ${coords[0].x} ${chartHeight - paddingY} Z`
+      : '';
+
+    const zeroY = chartHeight - paddingY - ((0 - minBound) / boundRange) * (chartHeight - paddingY * 2);
+
+    return { points: coords, minVal: minV, maxVal: maxV, pathD, areaD, zeroY };
+  }, [profitPoints]);
+
   const filtered = filter === 'all' ? bets : bets.filter(b => b.status === filter);
 
   const toggleExpand = (id: string) => {
@@ -240,6 +297,79 @@ export default function ProfilePage({ userId, onBack }: Props) {
             <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: (s as any).color || ((s as any).highlight ? 'var(--gold-bright)' : 'var(--cream)') }}>{s.val}</div>
           </div>
         ))}
+      </div>
+
+      {/* Wykres wydajności */}
+      <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', padding: '18px 20px', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'var(--text-3)', fontWeight: 600, marginBottom: 4 }}>Wykres wydajności</div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Skumulowany zysk/strata (PLN) na przestrzeni czasu</div>
+          </div>
+          {profitPoints.length >= 2 && (
+            <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: currentProfit >= 0 ? '#4caf82' : '#e05555' }}>
+              {currentProfit >= 0 ? '+' : ''}{currentProfit.toFixed(2)} PLN
+            </div>
+          )}
+        </div>
+
+        {profitPoints.length < 2 ? (
+          <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--line-cool)', background: 'rgba(255,255,255,0.01)', color: 'var(--text-3)', fontSize: 12, textAlign: 'center', padding: '0 20px' }}>
+            Rozlicz co najmniej 2 kupony, aby zobaczyć wykres wydajności.
+          </div>
+        ) : (
+          <div style={{ position: 'relative', width: '100%' }}>
+            <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} width="100%" height={chartHeight} style={{ overflow: 'visible', display: 'block' }}>
+              <defs>
+                <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chartColor} stopOpacity="0.25" />
+                  <stop offset="100%" stopColor={chartColor} stopOpacity="0.00" />
+                </linearGradient>
+              </defs>
+
+              {/* Zero Line */}
+              {minVal < 0 && maxVal > 0 && (
+                <line
+                  x1={paddingX}
+                  y1={zeroY}
+                  x2={chartWidth - paddingX}
+                  y2={zeroY}
+                  stroke="var(--line-cool)"
+                  strokeDasharray="4 4"
+                  strokeWidth={1}
+                />
+              )}
+
+              {/* Area path */}
+              <path d={areaD} fill="url(#chart-grad)" />
+
+              {/* Line path */}
+              <path d={pathD} fill="none" stroke={chartColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+
+              {/* Data points */}
+              {points.map((p, idx) => (
+                <circle
+                  key={idx}
+                  cx={p.x}
+                  cy={p.y}
+                  r={points.length > 15 ? 2.5 : 3.5}
+                  fill="var(--bg-1)"
+                  stroke={chartColor}
+                  strokeWidth={2}
+                  style={{ transition: 'r 0.1s' }}
+                />
+              ))}
+
+              {/* Min/Max indicators */}
+              <text x={paddingX} y={chartHeight - 4} fontSize={9} fontFamily="var(--f-mono)" fill="var(--text-3)">
+                Min: {minVal.toFixed(1)} PLN
+              </text>
+              <text x={chartWidth - paddingX} y={chartHeight - 4} textAnchor="end" fontSize={9} fontFamily="var(--f-mono)" fill="var(--text-3)">
+                Max: {maxVal.toFixed(1)} PLN
+              </text>
+            </svg>
+          </div>
+        )}
       </div>
 
       {/* Bets */}
