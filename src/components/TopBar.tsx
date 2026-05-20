@@ -53,8 +53,6 @@ export default function TopBar({ bets, onHome, onProfile, onDeposit, onAdmin, cu
 
         <nav className="nav-tabs">
           <button className={'nav-tab' + (currentPage === 'home' ? ' active' : '')} onClick={onHome}>Lobby</button>
-          <button className="nav-tab"><span className="live-dot" style={{ marginRight: 6 }} />Live</button>
-          <button className="nav-tab">Sporty</button>
         </nav>
 
         <div className="topbar-search">
