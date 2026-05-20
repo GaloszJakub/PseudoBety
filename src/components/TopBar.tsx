@@ -17,9 +17,11 @@ interface Props {
   balance?: number;
   user?: User | null;
   onMatchClick?: (matchId: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
-export default function TopBar({ bets, onHome, onProfile, onDeposit, onAdmin, currentPage, balance = 0, user, onMatchClick }: Props) {
+export default function TopBar({ bets, onHome, onProfile, onDeposit, onAdmin, currentPage, balance = 0, user, onMatchClick, searchQuery, onSearchChange }: Props) {
   const { logout } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [avatarMenu, setAvatarMenu] = useState(false);
@@ -56,9 +58,47 @@ export default function TopBar({ bets, onHome, onProfile, onDeposit, onAdmin, cu
           <button className={'nav-tab' + (currentPage === 'home' ? ' active' : '')} onClick={onHome}>Lobby</button>
         </nav>
 
-        <div className="topbar-search">
-          <span style={{ fontSize: 13 }}>⌕</span>
-          <span>Szukaj drużyny, ligi, zawodnika...</span>
+        <div className="topbar-search" style={{ position: 'relative', display: 'flex', alignItems: 'center', padding: 0 }}>
+          <span style={{ fontSize: 16, color: 'var(--text-3)', position: 'absolute', left: 12, pointerEvents: 'none' }}>⌕</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Szukaj drużyny, ligi..."
+            style={{
+              width: '100%',
+              height: '100%',
+              background: 'transparent',
+              border: 0,
+              color: 'var(--cream)',
+              fontFamily: 'inherit',
+              fontSize: 13,
+              padding: '0 32px 0 32px',
+              outline: 'none',
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange('')}
+              style={{
+                position: 'absolute',
+                right: 10,
+                background: 'transparent',
+                border: 0,
+                color: 'var(--text-3)',
+                cursor: 'pointer',
+                fontSize: 11,
+                padding: 4,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--cream)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-3)'}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         <div className="user-chips">

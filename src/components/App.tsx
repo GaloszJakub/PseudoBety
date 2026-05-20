@@ -26,16 +26,6 @@ function pageFromPath(path: string): string {
 export default function App() {
   const { user, balance, role, suspended, suspendedReason } = useAuth();
   const [page, setPage] = useState<string>('home');
-
-  useEffect(() => {
-    setPage(pageFromPath(window.location.pathname));
-  }, []);
-  const [bets, setBets] = useState<Bet[]>([]);
-  const [toast, setToast] = useState<{ pick: string; odds: number } | null>(null);
-  const [activeSport, setActiveSport] = useState('all');
-  const [activeLeague, setActiveLeague] = useState<string | null>(null);
-  const [depositOpen, setDepositOpen] = useState(false);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
 
   const scrollToTop = useCallback(() => {
@@ -43,6 +33,31 @@ export default function App() {
       mainRef.current.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
     }
   }, []);
+
+  useEffect(() => {
+    setPage(pageFromPath(window.location.pathname));
+  }, []);
+  const [bets, setBets] = useState<Bet[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (query.trim() !== '') {
+      setPage(prev => {
+        if (prev !== 'home') {
+          window.history.pushState(null, '', '/');
+          scrollToTop();
+          return 'home';
+        }
+        return prev;
+      });
+    }
+  }, [scrollToTop]);
+  const [toast, setToast] = useState<{ pick: string; odds: number } | null>(null);
+  const [activeSport, setActiveSport] = useState('all');
+  const [activeLeague, setActiveLeague] = useState<string | null>(null);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // SWR for all matches — cached 60s, no Firestore reads per client
   const { data: matchesData } = useSWR<{ live: Match[]; upcoming: Match[] }>(
@@ -151,16 +166,26 @@ export default function App() {
     return map;
   }, [matchesWithOdds]);
 
+  const matchesQuery = (m: Match) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      m.home.name.toLowerCase().includes(q) ||
+      m.away.name.toLowerCase().includes(q) ||
+      m.competition.toLowerCase().includes(q)
+    );
+  };
+
   const filterMatch = (m: Match) => {
     if (!hasOdds(m)) return false;
     if (activeSport === 'live') return false;
     if (activeSport !== 'all' && activeSport !== 'favorites' && m.sport !== activeSport) return false;
     if (activeLeague && m.competition !== activeLeague) return false;
-    return true;
+    return matchesQuery(m);
   };
 
   const filteredLive = activeSport === 'live'
-    ? liveMatches
+    ? liveMatches.filter(matchesQuery)
     : liveMatches.filter(filterMatch);
 
   const filteredUpcoming = activeSport === 'live'
@@ -186,7 +211,8 @@ export default function App() {
       <TopBar bets={bets} onHome={() => navigate('home')} currentPage={page}
               onProfile={() => navigate('profile')} onDeposit={() => setDepositOpen(true)}
               onAdmin={role === 'admin' ? () => navigate('admin') : undefined}
-              balance={balance} user={user} onMatchClick={navigate} />
+              balance={balance} user={user} onMatchClick={navigate}
+              searchQuery={searchQuery} onSearchChange={handleSearchChange} />
 
       <div className="app-body">
         <Sidebar
@@ -198,7 +224,8 @@ export default function App() {
         <main className="app-main" ref={mainRef}>
           {page === 'home' ? (
             <HomePage onMatchClick={navigate} onAddBet={handleAddBet} selectedBets={bets}
-                      liveMatches={filteredLive} upcomingMatches={filteredUpcoming} />
+                      liveMatches={filteredLive} upcomingMatches={filteredUpcoming}
+                      isLoading={!matchesData} />
           ) : page === 'profile' ? (
             <ProfilePage onMatchClick={navigate} />
           ) : page === 'admin' ? (

@@ -11,9 +11,10 @@ interface Props {
   selectedBets: Bet[];
   liveMatches: Match[];
   upcomingMatches: Match[];
+  isLoading?: boolean;
 }
 
-export default function HomePage({ onMatchClick, onAddBet, selectedBets, liveMatches, upcomingMatches }: Props) {
+export default function HomePage({ onMatchClick, onAddBet, selectedBets, liveMatches, upcomingMatches, isLoading }: Props) {
   const allMatches = [...liveMatches, ...upcomingMatches];
   const hasData = allMatches.length > 0;
 
@@ -30,11 +31,15 @@ export default function HomePage({ onMatchClick, onAddBet, selectedBets, liveMat
       {upcomingMatches.length > 0 ? (
         <UpcomingTable matches={upcomingMatches} onMatchClick={onMatchClick}
                        onAddBet={onAddBet} selectedBets={selectedBets} />
-      ) : !hasData ? (
+      ) : isLoading ? (
         <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-3)', fontSize: 14 }}>
-          Ładowanie meczy...
+          Ładowanie meczów...
         </div>
-      ) : null}
+      ) : (
+        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-3)', fontSize: 14 }}>
+          Brak dostępnych meczów spełniających kryteria wyszukiwania.
+        </div>
+      )}
     </div>
   );
 }
