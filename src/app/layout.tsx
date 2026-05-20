@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "bety — premium sports betting",
+  title: "PseudoBety",
   description: "Paper money sports betting",
 };
 
