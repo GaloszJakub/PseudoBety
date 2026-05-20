@@ -115,8 +115,13 @@ export async function GET(req: NextRequest) {
   const uniqueIds = [...new Set(matched.map(m => m.eventId))].slice(0, 300);
 
   let oddsGames = 0;
+  const chunks: number[][] = [];
   for (let i = 0; i < uniqueIds.length; i += 10) {
-    const ids = uniqueIds.slice(i, i + 10).join(',');
+    chunks.push(uniqueIds.slice(i, i + 10));
+  }
+
+  await Promise.all(chunks.map(async (chunk) => {
+    const ids = chunk.join(',');
     try {
       const res = await fetch(
         `${BASE_ODDS}/odds/multi?eventIds=${ids}&bookmakers=Bet365,22Bet&apiKey=${oddsKey}`,
@@ -125,13 +130,13 @@ export async function GET(req: NextRequest) {
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         errors.push(`odds/multi: ${res.status} — ${body.slice(0, 200)}`);
-        continue;
+        return;
       }
       const data: OddsEvent[] = await res.json();
-      if (!Array.isArray(data)) continue;
+      if (!Array.isArray(data)) return;
       for (const ev of data) { oddsIndex.set(ev.id, ev); oddsGames++; }
     } catch (e: any) { errors.push(`odds/multi: ${e.message}`); }
-  }
+  }));
 
   // ── Phase 5: Write odds to matched Firestore docs ──────────────────────────
 

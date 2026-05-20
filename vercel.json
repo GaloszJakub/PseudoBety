@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/fetch-fixtures",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-odds",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/settle-bets",
+      "schedule": "30 * * * *"
+    }
+  ]
+}
