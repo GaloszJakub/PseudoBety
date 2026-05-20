@@ -56,9 +56,10 @@ const STATUS_LABELS: Record<BetStatus, string> = {
 interface Props {
   userId?: string;
   onBack?: () => void;
+  onMatchClick?: (matchId: string) => void;
 }
 
-export default function ProfilePage({ userId, onBack }: Props) {
+export default function ProfilePage({ userId, onBack, onMatchClick }: Props) {
   const { user, balance, role: myRole, isPrivate: myIsPrivate } = useAuth();
 
   const isOwnProfile = !userId || userId === user?.uid;
@@ -425,7 +426,25 @@ export default function ProfilePage({ userId, onBack }: Props) {
                       <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>{sel.market}</div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cream)' }}>{sel.pick}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span>{sel.matchLabel}</span>
+                        <span
+                          onClick={() => {
+                            if (sel.matchId && onMatchClick) {
+                              onMatchClick(sel.matchId);
+                            }
+                          }}
+                          style={{
+                            cursor: sel.matchId ? 'pointer' : 'default',
+                            transition: 'color 0.1s',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (sel.matchId) e.currentTarget.style.color = 'var(--gold-bright)';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (sel.matchId) e.currentTarget.style.color = 'var(--text-2)';
+                          }}
+                        >
+                          {sel.matchLabel}
+                        </span>
                         {sel.score && (
                           <span style={{ color: 'var(--gold-bright)', fontWeight: 700 }}>
                             ({sel.score[0]}:{sel.score[1]})

@@ -186,7 +186,7 @@ export default function App() {
       <TopBar bets={bets} onHome={() => navigate('home')} currentPage={page}
               onProfile={() => navigate('profile')} onDeposit={() => setDepositOpen(true)}
               onAdmin={role === 'admin' ? () => navigate('admin') : undefined}
-              balance={balance} user={user} />
+              balance={balance} user={user} onMatchClick={navigate} />
 
       <div className="app-body">
         <Sidebar
@@ -200,11 +200,11 @@ export default function App() {
             <HomePage onMatchClick={navigate} onAddBet={handleAddBet} selectedBets={bets}
                       liveMatches={filteredLive} upcomingMatches={filteredUpcoming} />
           ) : page === 'profile' ? (
-            <ProfilePage />
+            <ProfilePage onMatchClick={navigate} />
           ) : page === 'admin' ? (
             <AdminPage onViewProfile={uid => navigate(`profile:${uid}`)} />
           ) : page.startsWith('profile:') ? (
-            <ProfilePage userId={page.slice(8)} onBack={goBack} />
+            <ProfilePage userId={page.slice(8)} onBack={goBack} onMatchClick={navigate} />
           ) : (
             <MatchDetailPage matchId={page} onBack={goBack}
                              onAddBet={handleAddBet} selectedBets={bets}

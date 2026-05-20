@@ -16,9 +16,10 @@ interface Props {
   currentPage: string;
   balance?: number;
   user?: User | null;
+  onMatchClick?: (matchId: string) => void;
 }
 
-export default function TopBar({ bets, onHome, onProfile, onDeposit, onAdmin, currentPage, balance = 0, user }: Props) {
+export default function TopBar({ bets, onHome, onProfile, onDeposit, onAdmin, currentPage, balance = 0, user, onMatchClick }: Props) {
   const { logout } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [avatarMenu, setAvatarMenu] = useState(false);
@@ -133,7 +134,22 @@ export default function TopBar({ bets, onHome, onProfile, onDeposit, onAdmin, cu
                                   <div style={{ fontSize: 11, color: 'var(--text-2)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                                     <span style={{ color: 'var(--cream)', fontWeight: 600 }}>{sel.pick}</span>
                                     <span style={{ color: 'var(--text-3)', margin: '0 4px' }}>·</span>
-                                    <span>{sel.matchLabel}</span>
+                                    <span
+                                      onClick={() => {
+                                        if (sel.matchId && onMatchClick) {
+                                          onMatchClick(sel.matchId);
+                                          setBetsOpen(false);
+                                        }
+                                      }}
+                                      style={{
+                                        cursor: 'pointer',
+                                        transition: 'color 0.1s',
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--gold-bright)'}
+                                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-2)'}
+                                    >
+                                      {sel.matchLabel}
+                                    </span>
                                   </div>
                                   <span className="mono" style={{ fontSize: 11, color: 'var(--gold)', flexShrink: 0 }}>{(sel.odds as number).toFixed(2)}</span>
                                 </div>
