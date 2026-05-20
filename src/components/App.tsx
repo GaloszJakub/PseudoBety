@@ -36,6 +36,14 @@ export default function App() {
   const [activeLeague, setActiveLeague] = useState<string | null>(null);
   const [depositOpen, setDepositOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  const scrollToTop = useCallback(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    }
+  }, []);
+
   // SWR for all matches — cached 60s, no Firestore reads per client
   const { data: matchesData } = useSWR<{ live: Match[]; upcoming: Match[] }>(
     '/api/matches',
@@ -49,11 +57,11 @@ export default function App() {
     const onPop = () => {
       const p = pageFromPath(window.location.pathname);
       setPage(p);
-      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      scrollToTop();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, []);
+  }, [scrollToTop]);
 
   const navigate = useCallback((target: string) => {
     if (target === 'home') {
@@ -68,8 +76,8 @@ export default function App() {
       window.history.pushState(null, '', `/match/${target}`);
     }
     setPage(target);
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
-  }, []);
+    scrollToTop();
+  }, [scrollToTop]);
 
   const goBack = useCallback(() => { window.history.back(); }, []);
 
@@ -95,24 +103,24 @@ export default function App() {
     setPage(prev => {
       if (prev !== 'home') {
         window.history.pushState(null, '', '/');
-        window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+        scrollToTop();
         return 'home';
       }
       return prev;
     });
-  }, []);
+  }, [scrollToTop]);
 
   const handleLeagueChange = useCallback((league: string | null) => {
     setActiveLeague(league);
     setPage(prev => {
       if (prev !== 'home') {
         window.history.pushState(null, '', '/');
-        window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+        scrollToTop();
         return 'home';
       }
       return prev;
     });
-  }, []);
+  }, [scrollToTop]);
 
   const allMatches = useMemo(() => [...liveMatches, ...upcomingMatches], [liveMatches, upcomingMatches]);
 
@@ -187,7 +195,7 @@ export default function App() {
           sportData={sportData} countryFlags={countryFlags} liveCount={liveMatches.length}
         />
 
-        <main className="app-main">
+        <main className="app-main" ref={mainRef}>
           {page === 'home' ? (
             <HomePage onMatchClick={navigate} onAddBet={handleAddBet} selectedBets={bets}
                       liveMatches={filteredLive} upcomingMatches={filteredUpcoming} />
