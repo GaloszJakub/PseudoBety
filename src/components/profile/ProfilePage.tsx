@@ -17,6 +17,7 @@ interface Selection {
   pick: string;
   odds: number;
   result?: string;
+  score?: [number, number];
 }
 
 interface UserBet {
@@ -293,13 +294,26 @@ export default function ProfilePage({ userId, onBack }: Props) {
                     <div>
                       <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>{sel.market}</div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cream)' }}>{sel.pick}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>{sel.matchLabel}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span>{sel.matchLabel}</span>
+                        {sel.score && (
+                          <span style={{ color: 'var(--gold-bright)', fontWeight: 700 }}>
+                            ({sel.score[0]}:{sel.score[1]})
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                       <div className="mono" style={{ fontSize: 14, fontWeight: 800, color: 'var(--gold-bright)' }}>{sel.odds.toFixed(2)}</div>
-                      {sel.result && (
-                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: sel.result === 'won' ? '#4caf82' : 'var(--down, #e05555)' }}>
-                          {sel.result === 'won' ? 'Trafiony' : 'Chybiony'}
+                      {sel.result && sel.result !== 'pending' && (
+                        <div style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          color: sel.result === 'won' ? '#4caf82' : sel.result === 'push' ? 'var(--text-3)' : 'var(--down, #e05555)'
+                        }}>
+                          {sel.result === 'won' ? 'Trafiony' : sel.result === 'push' ? 'Zwrot' : 'Chybiony'}
                         </div>
                       )}
                     </div>

@@ -25,6 +25,7 @@ interface Selection {
   marketType?: string;
   odds: number;
   result?: 'won' | 'lost' | 'pending' | 'push';
+  score?: [number, number];
 }
 
 interface Bet {
@@ -182,7 +183,11 @@ export async function GET(req: NextRequest) {
     const resolved = bet.selections.map(sel => {
       const m = finishedMap.get(sel.matchId);
       if (!m) return { ...sel, result: 'pending' as const };
-      return { ...sel, result: resolveSelection(sel, m) };
+      return { 
+        ...sel, 
+        result: resolveSelection(sel, m),
+        score: m.score
+      };
     });
 
     if (resolved.some(s => s.result === 'pending')) continue;
