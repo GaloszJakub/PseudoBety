@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
   // ── Phase 4: Fetch odds for matched events ──────────────────────────────────
 
   const oddsIndex = new Map<number, OddsEvent>();
-  const uniqueIds = [...new Set(matched.map(m => m.eventId))].slice(0, 200);
+  const uniqueIds = [...new Set(matched.map(m => m.eventId))].slice(0, 300);
 
   let oddsGames = 0;
   for (let i = 0; i < uniqueIds.length; i += 10) {
