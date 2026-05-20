@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       for (const ev of events) {
         const hs = nameScore(normHome, norm(ev.home));
         const as_ = nameScore(normAway, norm(ev.away));
-        if (hs < 1 || as_ < 1) continue;
+        if (hs < 0.35 || as_ < 0.35) continue;
         const score = hs + as_;
         if (score > bestScore) { bestScore = score; best = ev; }
       }
