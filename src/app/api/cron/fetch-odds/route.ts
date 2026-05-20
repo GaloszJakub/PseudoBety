@@ -28,8 +28,9 @@ export async function GET(req: NextRequest) {
 
   const snap = await adminDb.collection('matches')
     .where('status', '==', 'upcoming')
+    .where('commenceTime', '>=', now)
+    .where('commenceTime', '<=', in48h)
     .orderBy('commenceTime', 'asc')
-    .limit(500)
     .get();
 
   const fixtures = snap.docs.map(d => {
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
       sport: data.sport ?? 'football',
       commenceMs: ms,
     };
-  }).filter(f => f.commenceMs > now.getTime() && f.commenceMs < in48h.getTime());
+  });
 
   // ── Phase 2: Build event index from odds-api.io ─────────────────────────────
 

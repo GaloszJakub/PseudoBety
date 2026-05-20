@@ -132,27 +132,46 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 2. Pobierz zakończone mecze z wynikiem
-  const finishedSnap = await adminDb.collection('matches')
-    .where('status', '==', 'finished')
-    .get();
-
-  const finishedMap = new Map<string, FinishedMatch>();
-  for (const doc of finishedSnap.docs) {
-    const d = doc.data();
-    if (d.score) {
-      finishedMap.set(doc.id, {
-        score: [d.score[0], d.score[1]],
-        home: (d.home?.name || '').toLowerCase(),
-        away: (d.away?.name || '').toLowerCase(),
-      });
-    }
-  }
-
-  // 3. Rozlicz pending zakłady
+  // 2. Pobierz pending zakłady
   const pendingSnap = await adminDb.collection('bets')
     .where('status', '==', 'pending')
     .get();
+
+  if (pendingSnap.empty) {
+    return NextResponse.json({ ok: true, liveUpdated, finishedMatches: 0, settled: 0 });
+  }
+
+  // Zbierz unikalne ID meczów z oczekujących zakładów
+  const matchIds = new Set<string>();
+  for (const betDoc of pendingSnap.docs) {
+    const bet = betDoc.data() as Bet;
+    if (Array.isArray(bet.selections)) {
+      for (const sel of bet.selections) {
+        if (sel.matchId) {
+          matchIds.add(sel.matchId);
+        }
+      }
+    }
+  }
+
+  // Pobierz z bazy wyłącznie mecze powiązane z oczekującymi zakładami
+  const finishedMap = new Map<string, FinishedMatch>();
+  if (matchIds.size > 0) {
+    const refs = Array.from(matchIds).map(id => adminDb.doc(`matches/${id}`));
+    const matchSnaps = await adminDb.getAll(...refs);
+    for (const snap of matchSnaps) {
+      if (snap.exists) {
+        const d = snap.data();
+        if (d && d.status === 'finished' && d.score) {
+          finishedMap.set(snap.id, {
+            score: [d.score[0], d.score[1]],
+            home: (d.home?.name || '').toLowerCase(),
+            away: (d.away?.name || '').toLowerCase(),
+          });
+        }
+      }
+    }
+  }
 
   const batch = adminDb.batch();
   let settled = 0;
